@@ -768,6 +768,20 @@
     [self.topSearchPill setTitle:NLString(@"SEARCH_PLACEHOLDER", @"  🔍 Поиск места или адреса...") forState:UIControlStateNormal];
     [[VoiceGuidanceService sharedService] speak:NLString(@"SEARCHING_ROUTES", @"Ricerca itinerari alternativi...")];
 
+    // Imposta pin di destinazione e centra mappa subito
+    if (self.destinationPin) {
+        [self.mapView removeAnnotation:self.destinationPin];
+    }
+    self.destinationPin = [[MKPointAnnotation alloc] init];
+    self.destinationPin.coordinate = coordinate;
+    self.destinationPin.title = title ?: NLString(@"SELECTED_DESTINATION", @"Точка назначения");
+    [self.mapView addAnnotation:self.destinationPin];
+
+    if (CLLocationCoordinate2DIsValid(coordinate)) {
+        MKCoordinateRegion reg = MKCoordinateRegionMakeWithDistance(coordinate, 1200, 1200);
+        [self.mapView setRegion:reg animated:YES];
+    }
+
     __weak NavigationViewController *weakSelf = self;
     BOOL avoidTolls = self.routeSelector ? self.routeSelector.avoidTolls : NO;
     BOOL avoidHighways = self.routeSelector ? self.routeSelector.avoidHighways : NO;
@@ -786,6 +800,10 @@
         [weakSelf.topSearchPill setTitle:NLString(@"SEARCH_PLACEHOLDER", @"  🔍 Поиск места или адреса...") forState:UIControlStateNormal];
 
         if (error || routes.count == 0) {
+            if (CLLocationCoordinate2DIsValid(coordinate)) {
+                MKCoordinateRegion reg = MKCoordinateRegionMakeWithDistance(coordinate, 1200, 1200);
+                [weakSelf.mapView setRegion:reg animated:YES];
+            }
             NSString *errPrompt = (error.code == -2)
                 ? NLString(@"NO_ROUTE_FOUND", @"Nessun percorso stradale trovato per questa destinazione.")
                 : NLString(@"CALC_ERROR", @"Errore nel calcolo del percorso.");
@@ -800,15 +818,6 @@
             }
         }
 
-        // Imposta pin di destinazione
-        if (weakSelf.destinationPin) {
-            [weakSelf.mapView removeAnnotation:weakSelf.destinationPin];
-        }
-        weakSelf.destinationPin = [[MKPointAnnotation alloc] init];
-        weakSelf.destinationPin.coordinate = coordinate;
-        weakSelf.destinationPin.title = title ?: NLString(@"SELECTED_DESTINATION", @"Точка назначения");
-        [weakSelf.mapView addAnnotation:weakSelf.destinationPin];
-
         weakSelf.availableRoutes = routes;
         weakSelf.currentRoute = routes[0];
         weakSelf.currentStepIndex = 0;
@@ -820,9 +829,30 @@
         }
 
         RouteInfo *r0 = routes[0];
-        [weakSelf.mapView setVisibleMapRect:r0.polyline.boundingMapRect
-                                edgePadding:UIEdgeInsetsMake(120, 60, 220, 60)
-                                   animated:YES];
+        if (r0.polyline && r0.polyline.pointCount >= 2) {
+            MKMapRect mapRect = r0.polyline.boundingMapRect;
+            if (!MKMapRectIsNull(mapRect) && !MKMapRectIsEmpty(mapRect)) {
+                double minMeters = 800.0;
+                double mapPointsPerMeter = MKMapPointsPerMeterAtLatitude(weakSelf.mapView.centerCoordinate.latitude);
+                double minSize = mapPointsPerMeter * minMeters;
+                if (mapRect.size.width < minSize) {
+                    double diff = (minSize - mapRect.size.width) / 2.0;
+                    mapRect.origin.x -= diff;
+                    mapRect.size.width = minSize;
+                }
+                if (mapRect.size.height < minSize) {
+                    double diff = (minSize - mapRect.size.height) / 2.0;
+                    mapRect.origin.y -= diff;
+                    mapRect.size.height = minSize;
+                }
+                [weakSelf.mapView setVisibleMapRect:mapRect
+                                        edgePadding:UIEdgeInsetsMake(120, 60, 220, 60)
+                                           animated:YES];
+            }
+        } else if (CLLocationCoordinate2DIsValid(coordinate)) {
+            MKCoordinateRegion reg = MKCoordinateRegionMakeWithDistance(coordinate, 1200, 1200);
+            [weakSelf.mapView setRegion:reg animated:YES];
+        }
 
         // Mostra il selettore itinerari
         [weakSelf.poiResultsCard dismiss];
@@ -1126,9 +1156,27 @@
         }
 
         RouteInfo *r0 = routes[0];
-        [weakSelf.mapView setVisibleMapRect:r0.polyline.boundingMapRect
-                                edgePadding:UIEdgeInsetsMake(120, 60, 240, 60)
-                                   animated:YES];
+        if (r0.polyline && r0.polyline.pointCount >= 2) {
+            MKMapRect mapRect = r0.polyline.boundingMapRect;
+            if (!MKMapRectIsNull(mapRect) && !MKMapRectIsEmpty(mapRect)) {
+                double minMeters = 800.0;
+                double mapPointsPerMeter = MKMapPointsPerMeterAtLatitude(weakSelf.mapView.centerCoordinate.latitude);
+                double minSize = mapPointsPerMeter * minMeters;
+                if (mapRect.size.width < minSize) {
+                    double diff = (minSize - mapRect.size.width) / 2.0;
+                    mapRect.origin.x -= diff;
+                    mapRect.size.width = minSize;
+                }
+                if (mapRect.size.height < minSize) {
+                    double diff = (minSize - mapRect.size.height) / 2.0;
+                    mapRect.origin.y -= diff;
+                    mapRect.size.height = minSize;
+                }
+                [weakSelf.mapView setVisibleMapRect:mapRect
+                                        edgePadding:UIEdgeInsetsMake(120, 60, 240, 60)
+                                           animated:YES];
+            }
+        }
 
         [weakSelf.poiResultsCard dismiss];
         if (weakSelf.poiAnnotations.count > 0) {

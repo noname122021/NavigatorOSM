@@ -639,7 +639,24 @@ static NSString *const kLanguagePreferenceKey = @"AppLanguagePreference";
             @"TESTING_VOICE_MSG": @"Подключение к серверу речи...",
             @"SEARCH_RESULTS": @"Результаты поиска",
             @"MIC_UNAVAILABLE": @"Микрофон недоступен",
-            @"MIC_ERROR_MSG": @"Не удалось получить доступ к микрофону."
+            @"MIC_ERROR_MSG": @"Не удалось получить доступ к микрофону.",
+            @"OFFLINE_CACHED_BADGE": @"💾 Оффлайн (кэш)",
+            @"OFFLINE_DIRECT_BADGE": @"💾 Оффлайн",
+            @"OFFLINE_NO_TRAFFIC": @"💾 Оффлайн режим",
+            @"OFFLINE_SEARCH_NO_RESULTS": @"Нет сети и совпадений в оффлайн-кэше.",
+            @"RECENT_OFFLINE_BADGE": @"🕒 Недавнее (из кэша)",
+            @"OFFLINE_DIRECT_SUMMARY": @"Прямой оффлайн-маршрут (%.1f км)",
+            @"OFFLINE_DEPART": @"Направляйтесь к пункту назначения",
+            @"OFFLINE_ROUTE": @"Маршрут",
+            @"OFFLINE_CONTINUE_TO": @"Продолжайте движение к %@",
+            @"ARRIVED_AT_DESTINATION": @"Вы прибыли в пункт назначения",
+            @"DESTINATION": @"Пункт назначения",
+            @"HIGHWAY_ROUTE": @"Автомагистраль",
+            @"ROUTE_VARIANT": @"Маршрут",
+            @"SAME_DISTANCE": @"Та же дистанция",
+            @"SAME_TIME": @"То же время",
+            @"SPEED_CAMERA_GENERIC": @"Камера контроля скорости",
+            @"SPEED_LIMIT_FMT": @"Ограничение %d км/ч"
         },
 
         @"uk": @{

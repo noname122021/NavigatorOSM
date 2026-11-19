@@ -136,11 +136,6 @@ static NSString *const kRecentDestinationsKey = @"NavigatoreOSM_RecentDestinatio
     self.tableView.delegate = self;
     [self.view addSubview:self.tableView];
 
-    // Tap per chiudere la tastiera
-    UITapGestureRecognizer *tapToDismiss = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(dismissKeyboard)];
-    tapToDismiss.cancelsTouchesInView = NO;
-    [self.tableView addGestureRecognizer:tapToDismiss];
-
     // Spinner
     self.spinner = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleWhiteLarge];
     self.spinner.center = CGPointMake(self.view.bounds.size.width / 2.0, 140);
@@ -219,6 +214,11 @@ static NSString *const kRecentDestinationsKey = @"NavigatoreOSM_RecentDestinatio
     for (UIView *sub in view.subviews) {
         [self recursivelyStyleTextFieldInView:sub];
     }
+}
+
+- (void)dismissKeyboard {
+    [self.searchBar resignFirstResponder];
+    [self.view endEditing:YES];
 }
 
 - (void)handleClose {
@@ -782,6 +782,10 @@ static NSString *const kRecentDestinationsKey = @"NavigatoreOSM_RecentDestinatio
     return cell;
 }
 
+- (void)scrollViewWillBeginDragging:(UIScrollView *)scrollView {
+    [self.searchBar resignFirstResponder];
+}
+
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
     [tableView deselectRowAtIndexPath:indexPath animated:YES];
 
@@ -797,12 +801,22 @@ static NSString *const kRecentDestinationsKey = @"NavigatoreOSM_RecentDestinatio
     }
 
     NSInteger resultIndex = (self.showMapAllButton && !self.showingRecents) ? (indexPath.row - 1) : indexPath.row;
+    if (resultIndex < 0 || resultIndex >= (NSInteger)self.results.count) {
+        return;
+    }
     SearchItem *selected = self.results[resultIndex];
+    if (!selected) return;
 
-    [SearchViewController saveRecentDestinationWithTitle:selected.displayName coordinate:selected.coordinate];
+    CLLocationCoordinate2D selectedCoord = selected.coordinate;
+    NSString *selectedTitle = [selected.displayName copy] ?: [selected.title copy];
 
-    if ([self.delegate respondsToSelector:@selector(searchViewControllerDidSelectLocation:title:)]) {
-        [self.delegate searchViewControllerDidSelectLocation:selected.coordinate title:selected.displayName];
+    [SearchViewController saveRecentDestinationWithTitle:selectedTitle coordinate:selectedCoord];
+
+    [self.searchBar resignFirstResponder];
+
+    id<SearchViewControllerDelegate> delegate = self.delegate;
+    if ([delegate respondsToSelector:@selector(searchViewControllerDidSelectLocation:title:)]) {
+        [delegate searchViewControllerDidSelectLocation:selectedCoord title:selectedTitle];
     }
     [self dismissViewControllerAnimated:YES completion:nil];
 }

@@ -968,12 +968,15 @@ static NSString * const kOfflineRoutesPath = @"/var/mobile/Documents/offline_rou
 - (NSArray *)cachedOfflineRoutesFrom:(CLLocationCoordinate2D)start
                                   to:(CLLocationCoordinate2D)destination
                                title:(NSString *)title {
+    if (![[NSFileManager defaultManager] fileExistsAtPath:kOfflineRoutesPath]) return nil;
     NSArray *list = [NSArray arrayWithContentsOfFile:kOfflineRoutesPath];
-    if (list.count == 0) return nil;
+    if (![list isKindOfClass:[NSArray class]] || list.count == 0) return nil;
 
     for (NSDictionary *dict in list) {
+        if (![dict isKindOfClass:[NSDictionary class]]) continue;
         double dLat = [dict[@"destLat"] doubleValue];
         double dLon = [dict[@"destLon"] doubleValue];
+        if (dLat == 0.0 && dLon == 0.0) continue;
 
         CLLocation *dLoc = [[CLLocation alloc] initWithLatitude:dLat longitude:dLon];
         CLLocation *targetLoc = [[CLLocation alloc] initWithLatitude:destination.latitude longitude:destination.longitude];
@@ -981,31 +984,53 @@ static NSString * const kOfflineRoutesPath = @"/var/mobile/Documents/offline_rou
 
         if (dist <= 500.0) {
             NSArray *coordList = dict[@"coords"];
-            if (coordList.count == 0) continue;
+            if (![coordList isKindOfClass:[NSArray class]] || coordList.count < 2) continue;
 
             NSUInteger count = coordList.count;
             CLLocationCoordinate2D *coords = malloc(sizeof(CLLocationCoordinate2D) * count);
+            if (!coords) continue;
+
+            NSUInteger validCount = 0;
             for (NSUInteger i = 0; i < count; i++) {
-                NSArray *pt = coordList[i];
-                coords[i] = CLLocationCoordinate2DMake([pt[0] doubleValue], [pt[1] doubleValue]);
+                id pt = coordList[i];
+                double lat = 0.0, lon = 0.0;
+                if ([pt isKindOfClass:[NSArray class]] && [(NSArray *)pt count] >= 2) {
+                    lat = [pt[0] doubleValue];
+                    lon = [pt[1] doubleValue];
+                } else if ([pt isKindOfClass:[NSDictionary class]]) {
+                    lat = [pt[@"lat"] doubleValue];
+                    lon = [pt[@"lon"] doubleValue];
+                }
+                if (lat != 0.0 || lon != 0.0) {
+                    coords[validCount++] = CLLocationCoordinate2DMake(lat, lon);
+                }
             }
 
-            MKPolyline *polyline = [MKPolyline polylineWithCoordinates:coords count:count];
+            if (validCount < 2) {
+                free(coords);
+                continue;
+            }
+
+            MKPolyline *polyline = [MKPolyline polylineWithCoordinates:coords count:validCount];
             free(coords);
 
             NSMutableArray *steps = [NSMutableArray array];
-            for (NSDictionary *sDict in dict[@"steps"]) {
-                ManeuverStep *step = [[ManeuverStep alloc] init];
-                step.instruction = sDict[@"instruction"];
-                step.streetName = sDict[@"streetName"];
-                step.ref = sDict[@"ref"];
-                step.speedLimit = [sDict[@"speedLimit"] intValue];
-                step.type = sDict[@"type"];
-                step.modifier = sDict[@"modifier"];
-                step.distance = [sDict[@"distance"] doubleValue];
-                step.duration = [sDict[@"duration"] doubleValue];
-                step.coordinate = CLLocationCoordinate2DMake([sDict[@"lat"] doubleValue], [sDict[@"lon"] doubleValue]);
-                [steps addObject:step];
+            NSArray *rawSteps = dict[@"steps"];
+            if ([rawSteps isKindOfClass:[NSArray class]]) {
+                for (NSDictionary *sDict in rawSteps) {
+                    if (![sDict isKindOfClass:[NSDictionary class]]) continue;
+                    ManeuverStep *step = [[ManeuverStep alloc] init];
+                    step.instruction = sDict[@"instruction"];
+                    step.streetName = sDict[@"streetName"];
+                    step.ref = sDict[@"ref"];
+                    step.speedLimit = [sDict[@"speedLimit"] intValue];
+                    step.type = sDict[@"type"];
+                    step.modifier = sDict[@"modifier"];
+                    step.distance = [sDict[@"distance"] doubleValue];
+                    step.duration = [sDict[@"duration"] doubleValue];
+                    step.coordinate = CLLocationCoordinate2DMake([sDict[@"lat"] doubleValue], [sDict[@"lon"] doubleValue]);
+                    [steps addObject:step];
+                }
             }
 
             RouteInfo *info = [[RouteInfo alloc] init];
@@ -1031,10 +1056,15 @@ static NSString * const kOfflineRoutesPath = @"/var/mobile/Documents/offline_rou
 - (RouteInfo *)offlineDirectRouteFrom:(CLLocationCoordinate2D)start
                                    to:(CLLocationCoordinate2D)destination
                                 title:(NSString *)title {
+    if (!CLLocationCoordinate2DIsValid(start) || !CLLocationCoordinate2DIsValid(destination)) {
+        return nil;
+    }
     CLLocation *startLoc = [[CLLocation alloc] initWithLatitude:start.latitude longitude:start.longitude];
     CLLocation *destLoc = [[CLLocation alloc] initWithLatitude:destination.latitude longitude:destination.longitude];
     CLLocationDistance directDist = [startLoc distanceFromLocation:destLoc];
-    if (directDist < 5.0) return nil;
+    if (directDist < 5.0) {
+        directDist = 50.0;
+    }
 
     CLLocationDistance roadDist = directDist * 1.25;
     NSTimeInterval duration = roadDist / 9.7; // ~35 km/h
